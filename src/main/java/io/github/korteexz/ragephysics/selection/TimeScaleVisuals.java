@@ -1,15 +1,17 @@
 package io.github.korteexz.ragephysics.selection;
 
+import io.github.korteexz.ragephysics.temporal.TemporalTickBudget;
+
 /** Matemática compartilhada pela GUI e pelo preview; sem efeitos na simulação. */
 public final class TimeScaleVisuals {
-    public static final double MIN = 0.125;
-    public static final double MAX = 8.0;
+    public static final double MIN = TemporalTickBudget.MIN_SCALE;
+    public static final double MAX = TemporalTickBudget.MAX_SCALE;
     private static final int BLUE = 0x4080FF;
     private static final int WHITE = 0xFFFFFF;
     private static final int RED = 0xFF4040;
 
     public static boolean isValid(double scale) {
-        return Double.isFinite(scale) && scale >= MIN && scale <= MAX;
+        return TemporalTickBudget.isValid(scale);
     }
 
     /** Posição vanilla [0, 1]: o centro exato (0.5) corresponde a 1x. */

@@ -104,7 +104,7 @@ public final class RegionControlScreen extends Screen {
             graphics.drawCenteredString(font, ticks[i], tickX, top + 132,
                     TimeScaleVisuals.color(TimeScaleVisuals.fromSlider(i / 6.0)));
         }
-        graphics.drawCenteredString(font, Component.translatable("screen.ragephysics.visual_only"),
+        graphics.drawCenteredString(font, Component.translatable("screen.ragephysics.server_categories"),
                 center, top + 154, 0xFFBBBBBB);
     }
 }

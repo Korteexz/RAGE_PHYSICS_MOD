@@ -5,7 +5,7 @@
   "screen.ragephysics.region_control": "Controle da Região",
   "screen.ragephysics.time_scale": "Escala temporal: %s",
   "screen.ragephysics.reset": "Restaurar 1x",
-  "screen.ragephysics.visual_only": "Apenas prévia visual",
+  "screen.ragephysics.server_categories": "Categorias definidas pelo servidor",
   "message.ragephysics.incomplete_selection": "Selecione A e B com a Varinha de Seleção primeiro.",
   "message.ragephysics.selection_changed": "Seleção alterada ou valor inválido. Pressione K para reabrir."
 }

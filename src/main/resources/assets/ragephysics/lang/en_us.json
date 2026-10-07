@@ -5,7 +5,7 @@
   "screen.ragephysics.region_control": "Region Control",
   "screen.ragephysics.time_scale": "Time Scale: %s",
   "screen.ragephysics.reset": "Reset to 1x",
-  "screen.ragephysics.visual_only": "Visual preview only",
+  "screen.ragephysics.server_categories": "Categories set by the server",
   "message.ragephysics.incomplete_selection": "Select both A and B with the Selection Wand first.",
   "message.ragephysics.selection_changed": "Selection changed or value invalid. Press K to reopen."
 }

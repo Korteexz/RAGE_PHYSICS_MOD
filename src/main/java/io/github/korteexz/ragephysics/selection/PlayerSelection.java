@@ -1,6 +1,8 @@
 package io.github.korteexz.ragephysics.selection;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 
 public class PlayerSelection {
 
@@ -10,7 +12,7 @@ public class PlayerSelection {
 
     private BlockPos posA;
     private BlockPos posB;
-    // Configuração apenas visual; não altera ticks ou física.
+    private ResourceKey<Level> dimension;
     private double timeScale = 1.0;
     private long revision;
 
@@ -19,8 +21,17 @@ public class PlayerSelection {
     // DEFINIR POSIÇÃO
     // =========================
 
-    public void select(BlockPos pos) {
+    public void select(ResourceKey<Level> dimension, BlockPos pos) {
         revision++;
+
+        // Nunca completa A/B entre dimensões diferentes.
+        if (!dimension.equals(this.dimension)) {
+            this.dimension = dimension;
+            posA = pos.immutable();
+            posB = null;
+            timeScale = 1.0;
+            return;
+        }
 
         // Primeiro clique:
         // cria a posição A.
@@ -70,7 +81,23 @@ public class PlayerSelection {
     }
 
     public boolean isComplete() {
-        return posA != null && posB != null;
+        return dimension != null && posA != null && posB != null;
+    }
+
+    public ResourceKey<Level> getDimension() {
+        return dimension;
+    }
+
+    public boolean isInDimension(ResourceKey<Level> dimension) {
+        return dimension.equals(this.dimension);
+    }
+
+    /** Coordenadas de blocos inclusivas, como a caixa desenhada pelo preview. */
+    public boolean contains(ResourceKey<Level> dimension, BlockPos pos) {
+        return isComplete() && isInDimension(dimension)
+                && pos.getX() >= Math.min(posA.getX(), posB.getX()) && pos.getX() <= Math.max(posA.getX(), posB.getX())
+                && pos.getY() >= Math.min(posA.getY(), posB.getY()) && pos.getY() <= Math.max(posA.getY(), posB.getY())
+                && pos.getZ() >= Math.min(posA.getZ(), posB.getZ()) && pos.getZ() <= Math.max(posA.getZ(), posB.getZ());
     }
 
     public double getTimeScale() {

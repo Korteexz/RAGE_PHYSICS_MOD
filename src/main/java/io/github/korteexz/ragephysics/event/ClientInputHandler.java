@@ -3,6 +3,7 @@ package io.github.korteexz.ragephysics.event;
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.korteexz.ragephysics.RagePhysics;
 import io.github.korteexz.ragephysics.client.RegionControlScreen;
+import io.github.korteexz.ragephysics.client.TemporalEntityPresentation;
 import io.github.korteexz.ragephysics.network.RegionControlNetworking;
 import io.github.korteexz.ragephysics.network.RegionControlPayloads;
 import net.minecraft.client.KeyMapping;
@@ -43,10 +44,11 @@ public final class ClientInputHandler {
         public static void registerPayloads(RegisterPayloadHandlersEvent event) {
             RegionControlNetworking.register(event, (payload, context) -> {
                 Minecraft minecraft = Minecraft.getInstance();
-                if (minecraft.player != null && minecraft.level != null && minecraft.screen == null) {
+                if (minecraft.player != null && minecraft.level != null && minecraft.screen == null
+                        && minecraft.level.dimension().location().equals(payload.dimension())) {
                     minecraft.setScreen(new RegionControlScreen(payload));
                 }
-            });
+            }, (payload, context) -> TemporalEntityPresentation.receive(payload));
         }
     }
 

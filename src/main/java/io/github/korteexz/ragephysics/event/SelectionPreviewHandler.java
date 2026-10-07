@@ -51,7 +51,7 @@ public final class SelectionPreviewHandler {
                 SelectionManager.get(player);
 
         // Sem A + B, ainda não existe caixa completa.
-        if (!selection.isComplete()) {
+        if (!selection.isComplete() || !selection.isInDimension(player.level().dimension())) {
             return;
         }
 

@@ -19,9 +19,10 @@ public final class RegionControlPayloads {
         public Type<Request> type() { return TYPE; }
     }
 
-    public record Open(BlockPos posA, BlockPos posB, long revision, double timeScale) implements CustomPacketPayload {
+    public record Open(ResourceLocation dimension, BlockPos posA, BlockPos posB, long revision, double timeScale) implements CustomPacketPayload {
         public static final Type<Open> TYPE = new Type<>(id("open_region_control"));
         public static final StreamCodec<FriendlyByteBuf, Open> CODEC = StreamCodec.composite(
+                ResourceLocation.STREAM_CODEC, Open::dimension,
                 BlockPos.STREAM_CODEC, Open::posA,
                 BlockPos.STREAM_CODEC, Open::posB,
                 ByteBufCodecs.VAR_LONG, Open::revision,

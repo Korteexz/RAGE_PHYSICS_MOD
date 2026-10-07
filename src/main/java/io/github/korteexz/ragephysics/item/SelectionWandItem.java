@@ -56,11 +56,12 @@ public class SelectionWandItem extends Item {
         // Decide se este clique será A ou B.
         boolean selectingA =
                 !selection.hasPosA()
+                        || !selection.isInDimension(level.dimension())
                         || selection.isComplete();
 
 
         // Faz a seleção.
-        selection.select(clickedPos);
+        selection.select(level.dimension(), clickedPos);
 
 
         // Feedback visual provisório via chat.
