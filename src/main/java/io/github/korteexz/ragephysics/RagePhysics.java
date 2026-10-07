@@ -1,26 +1,23 @@
 package io.github.korteexz.ragephysics;
 
 import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
+import io.github.korteexz.ragephysics.registry.ModItems;
 
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+
+import org.slf4j.Logger;
 
 @Mod(RagePhysics.MODID)
 public class RagePhysics {
 
-    // =========================
-    // IDENTIDADE
-    // =========================
-
-    public static final String MODID = "RagePhysics";
+    public static final String MODID = "ragephysics";
     public static final Logger LOGGER = LogUtils.getLogger();
 
+    public RagePhysics(IEventBus modBus) {
 
-    // =========================
-    // INICIALIZAÇÃO
-    // =========================
+        ModItems.register(modBus);
 
-    public RagePhysics() {
         LOGGER.info("Rage Physics loaded.");
     }
 }

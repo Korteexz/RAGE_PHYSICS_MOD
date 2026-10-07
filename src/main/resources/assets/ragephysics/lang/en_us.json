@@ -1,0 +1,11 @@
+{
+  "item.ragephysics.selection_wand": "Selection Wand",
+  "key.categories.ragephysics": "Rage Physics",
+  "key.ragephysics.region_control": "Open region control",
+  "screen.ragephysics.region_control": "Region Control",
+  "screen.ragephysics.time_scale": "Time Scale: %s",
+  "screen.ragephysics.reset": "Reset to 1x",
+  "screen.ragephysics.visual_only": "Visual preview only",
+  "message.ragephysics.incomplete_selection": "Select both A and B with the Selection Wand first.",
+  "message.ragephysics.selection_changed": "Selection changed or value invalid. Press K to reopen."
+}
