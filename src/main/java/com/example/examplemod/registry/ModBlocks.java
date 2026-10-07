@@ -1,32 +1,39 @@
 package com.example.examplemod.registry;
 
 import com.example.examplemod.ExampleMod;
-import com.example.examplemod.FireballWandItem;
+import com.example.examplemod.block.RainBlock;
 
-import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockBehaviour;
 
-import net.neoforged.neoforge.registries.DeferredItem;
+import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-public final class ModItems {
+public final class ModBlocks {
 
-    // TODOS OS ITENS DO MOD
-    public static final DeferredRegister.Items ITEMS =
-            DeferredRegister.createItems(ExampleMod.MODID);
+    // =========================
+    // REGISTRY DE BLOCOS
+    // =========================
 
-    // FIREBALL WAND
-    public static final DeferredItem<FireballWandItem> FIREBALL_WAND =
-            ITEMS.registerItem(
-                    "fireball_wand",
-                    FireballWandItem::new
+    public static final DeferredRegister.Blocks BLOCKS =
+            DeferredRegister.createBlocks(
+                    ExampleMod.MODID
             );
 
-    // ITEM QUE REPRESENTA O RAIN BLOCK NO INVENTÁRIO
-    public static final DeferredItem<BlockItem> RAIN_BLOCK_ITEM =
-            ITEMS.registerSimpleBlockItem(
+
+    // =========================
+    // RAIN BLOCK
+    // =========================
+
+    public static final DeferredBlock<RainBlock> RAIN_BLOCK =
+            BLOCKS.registerBlock(
                     "rain_block",
-                    ModBlocks.RAIN_BLOCK
+                    RainBlock::new,
+                    BlockBehaviour.Properties.ofFullCopy(
+                            Blocks.NETHERITE_BLOCK
+                    )
             );
 
-    private ModItems() {}
+
+    private ModBlocks() {}
 }

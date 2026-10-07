@@ -11,7 +11,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-
+import com.example.examplemod.registry.ModBlockEntities;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 public class RainBlockEntity extends BlockEntity {
@@ -36,7 +36,11 @@ public class RainBlockEntity extends BlockEntity {
     };
 
     public RainBlockEntity(BlockPos pos, BlockState state) {
-        super(ExampleMod.RAIN_BLOCK_ENTITY.get(), pos, state);
+        super(
+                ModBlockEntities.RAIN_BLOCK_ENTITY.get(),
+                pos,
+                state
+        );
     }
 
     public ItemStackHandler getInventory() {
