@@ -1,26 +1,27 @@
 package io.github.korteexz.ragephysics.temporal;
 
 import io.github.korteexz.ragephysics.network.TemporalEntityPayload;
-import io.github.korteexz.ragephysics.selection.PlayerSelection;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
 import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.server.level.ServerLevel;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class TemporalEntityTicker {
     // Chaves fracas + remoção explícita no lifecycle. O valor nunca referencia a entidade.
     private static final Map<Entity, State> STATES = new WeakHashMap<>();
 
-    private static PlayerSelection region(Entity entity) {
+    private static TemporalRegion region(Entity entity) {
         if (entity instanceof Player || entity.isPassenger() || entity.isVehicle() || entity.isRemoved()) return null;
-        return TemporalRegionResolver.resolve(entity.level().dimension(), entity.blockPosition(), TemporalTarget.classify(entity));
+        return TemporalRegionResolver.resolve((ServerLevel) entity.level(), entity.blockPosition(), TemporalTarget.classify(entity));
     }
 
     public static double scale(Entity entity) {
-        PlayerSelection selection = region(entity);
-        return selection == null ? 1.0 : selection.getTimeScale();
+        TemporalRegion region = region(entity);
+        return region == null ? 1.0 : region.timeScale();
     }
 
     public static boolean hasTemporalWork(Entity entity) {
@@ -31,8 +32,8 @@ public final class TemporalEntityTicker {
     public static void tick(Entity entity, Runnable vanillaDispatcher) {
         State state = STATES.get(entity);
         if (state != null && state.running) return; // Reentrada do mesmo sujeito, inclusive via outro mod.
-        PlayerSelection selection = region(entity);
-        if (selection == null) {
+        TemporalRegion region = region(entity);
+        if (region == null) {
             if (STATES.remove(entity) != null && !entity.isRemoved()) send(entity, 1.0);
             vanillaDispatcher.run();
             return;
@@ -42,17 +43,17 @@ public final class TemporalEntityTicker {
             state = new State();
             STATES.put(entity, state);
         }
-        double scale = selection.getTimeScale();
-        long revision = selection.getRevision();
-        int steps = state.budget.advance(selection, revision, scale);
+        double scale = region.timeScale();
+        long revision = region.revision();
+        int steps = state.budget.advance(region.id(), revision, scale);
         boolean changed = state.lastScale != scale;
         state.running = true;
         try {
             for (int step = 0; step < steps; step++) {
                 vanillaDispatcher.run();
-                PlayerSelection next = region(entity);
+                TemporalRegion next = region(entity);
                 // Se cruzou uma fronteira ou mudou de lifecycle, descarta o resto do budget deste tick.
-                if (next != selection || selection.getRevision() != revision || selection.getTimeScale() != scale) {
+                if (next != region || region.revision() != revision || region.timeScale() != scale) {
                     state.budget.reset();
                     break;
                 }

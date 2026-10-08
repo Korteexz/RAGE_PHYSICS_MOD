@@ -2,6 +2,7 @@ package io.github.korteexz.ragephysics.item;
 
 import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.selection.SelectionManager;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -62,6 +63,13 @@ public class SelectionWandItem extends Item {
 
         // Faz a seleção.
         selection.select(level.dimension(), clickedPos);
+        boolean regionCreated = true;
+        if (selection.isComplete()) {
+            var region = TemporalRegionSavedData.get((net.minecraft.server.level.ServerLevel) level)
+                    .createForSelection(player.getUUID(), selection);
+            region.ifPresent(created -> selection.bindRegion(created.id()));
+            regionCreated = region.isPresent();
+        }
 
 
         // Feedback visual provisório via chat.
@@ -85,12 +93,9 @@ public class SelectionWandItem extends Item {
                     false
             );
 
-            player.displayClientMessage(
-                    Component.literal(
-                            "[RAGE PHYSICS] Região selecionada."
-                    ),
-                    false
-            );
+            player.displayClientMessage(Component.literal(regionCreated
+                    ? "[RAGE PHYSICS] Região selecionada."
+                    : "[RAGE PHYSICS] Região sobrepõe outra região e não foi criada."), false);
         }
 
 

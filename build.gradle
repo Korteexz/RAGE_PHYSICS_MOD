@@ -41,6 +41,10 @@ neoForge {
     // Specify the version of NeoForge to use.
     version = project.neo_version
 
+    // ModDevGradle enables Minecraft/NeoForge only for main by default.
+    // The standalone temporal checks in src/test/java also compile against these types.
+    addModdingDependenciesTo(sourceSets.test)
+
     parchment {
         mappingsVersion = project.parchment_mappings_version
         minecraftVersion = project.parchment_minecraft_version

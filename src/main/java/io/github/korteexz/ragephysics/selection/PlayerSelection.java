@@ -3,6 +3,7 @@ package io.github.korteexz.ragephysics.selection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import java.util.UUID;
 
 public class PlayerSelection {
 
@@ -15,6 +16,7 @@ public class PlayerSelection {
     private ResourceKey<Level> dimension;
     private double timeScale = 1.0;
     private long revision;
+    private UUID regionId;
 
 
     // =========================
@@ -30,6 +32,7 @@ public class PlayerSelection {
             posA = pos.immutable();
             posB = null;
             timeScale = 1.0;
+            regionId = null;
             return;
         }
 
@@ -52,6 +55,7 @@ public class PlayerSelection {
         posA = pos.immutable();
         posB = null;
         timeScale = 1.0;
+        regionId = null;
     }
 
 
@@ -106,6 +110,14 @@ public class PlayerSelection {
 
     public long getRevision() {
         return revision;
+    }
+
+    public UUID getRegionId() {
+        return regionId;
+    }
+
+    public void bindRegion(UUID regionId) {
+        this.regionId = regionId;
     }
 
     /** Rejeita telas antigas e valores inválidos antes de mudar o estado. */

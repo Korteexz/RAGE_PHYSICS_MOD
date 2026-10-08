@@ -1,8 +1,6 @@
 package io.github.korteexz.ragephysics.selection;
 
-import java.util.TreeMap;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -15,9 +13,7 @@ public final class SelectionManager {
     // =========================
 
     private static final Map<UUID, PlayerSelection> SELECTIONS =
-            new TreeMap<>();
-    private static final Collection<PlayerSelection> ORDERED_SELECTIONS =
-            Collections.unmodifiableCollection(SELECTIONS.values());
+            new HashMap<>();
 
 
     // =========================
@@ -33,11 +29,6 @@ public final class SelectionManager {
                 player.getUUID(),
                 uuid -> new PlayerSelection()
         );
-    }
-
-    /** Ordem natural de UUID: desempate estável entre regiões sobrepostas. Apenas servidor. */
-    public static Collection<PlayerSelection> orderedSelections() {
-        return ORDERED_SELECTIONS;
     }
 
     public static void remove(Player player) {

@@ -5,6 +5,8 @@ import io.github.korteexz.ragephysics.item.SelectionWandItem;
 import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.selection.SelectionManager;
 import io.github.korteexz.ragephysics.selection.TimeScaleVisuals;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -65,8 +67,14 @@ public final class SelectionPreviewHandler {
                 player,
                 a,
                 b,
-                new DustParticleOptions(Vec3.fromRGB24(TimeScaleVisuals.color(selection.getTimeScale())).toVector3f(), 0.65F)
+                new DustParticleOptions(Vec3.fromRGB24(TimeScaleVisuals.color(activeScale(player, selection))).toVector3f(), 0.65F)
         );
+    }
+
+    private static double activeScale(ServerPlayer player, PlayerSelection selection) {
+        TemporalRegion region = selection.getRegionId() == null ? null
+                : TemporalRegionSavedData.get(player.serverLevel()).getById(selection.getRegionId()).orElse(null);
+        return region == null ? selection.getTimeScale() : region.timeScale();
     }
 
 

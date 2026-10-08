@@ -3,6 +3,8 @@ package io.github.korteexz.ragephysics.network;
 import io.github.korteexz.ragephysics.RagePhysics;
 import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.selection.SelectionManager;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
 import net.minecraft.network.chat.Component;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -32,15 +34,26 @@ public final class RegionControlNetworking {
             context.player().displayClientMessage(Component.translatable("message.ragephysics.incomplete_selection"), true);
             return;
         }
+        TemporalRegion region = selection.getRegionId() == null ? null
+                : TemporalRegionSavedData.get((net.minecraft.server.level.ServerLevel) context.player().level())
+                        .getById(selection.getRegionId()).orElse(null);
+        if (region == null || !region.owner().equals(context.player().getUUID())) {
+            context.player().displayClientMessage(Component.translatable("message.ragephysics.selection_changed"), true);
+            return;
+        }
         context.reply(new RegionControlPayloads.Open(selection.getDimension().location(), selection.getPosA(), selection.getPosB(),
-                selection.getRevision(), selection.getTimeScale()));
+                selection.getRevision(), region.timeScale()));
     }
 
     private static void update(RegionControlPayloads.Update payload, IPayloadContext context) {
         // A identidade vem da conexão: o cliente nunca escolhe a seleção de outro jogador.
         PlayerSelection selection = SelectionManager.get(context.player());
-        if (!selection.isInDimension(context.player().level().dimension())
-                || !selection.updateTimeScale(payload.revision(), payload.timeScale())) {
+        TemporalRegionSavedData data = TemporalRegionSavedData.get((net.minecraft.server.level.ServerLevel) context.player().level());
+        TemporalRegion region = selection.getRegionId() == null ? null : data.getById(selection.getRegionId()).orElse(null);
+        if (!selection.isInDimension(context.player().level().dimension()) || region == null
+                || !region.owner().equals(context.player().getUUID())
+                || !selection.updateTimeScale(payload.revision(), payload.timeScale())
+                || !data.updateTimeScale(context.player().getUUID(), region.id(), payload.timeScale())) {
             context.player().displayClientMessage(Component.translatable("message.ragephysics.selection_changed"), true);
         }
     }
