@@ -120,6 +120,16 @@ public class PlayerSelection {
         this.regionId = regionId;
     }
 
+    /** Consumes the current spatial draft after a successful explicit create. */
+    public void clear() {
+        revision++;
+        posA = null;
+        posB = null;
+        dimension = null;
+        timeScale = 1.0;
+        regionId = null;
+    }
+
     /** Rejeita telas antigas e valores inválidos antes de mudar o estado. */
     public boolean updateTimeScale(long expectedRevision, double value) {
         if (!isComplete() || revision != expectedRevision || !TimeScaleVisuals.isValid(value)) {

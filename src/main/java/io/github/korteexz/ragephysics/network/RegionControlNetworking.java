@@ -24,7 +24,7 @@ public final class RegionControlNetworking {
                                 IPayloadHandler<RegionManagementPayloads.ListResponse> listHandler,
                                 IPayloadHandler<RegionManagementPayloads.DetailsResponse> detailsHandler,
                                 IPayloadHandler<RegionManagementPayloads.OperationResponse> operationHandler) {
-        var registrar = event.registrar("3");
+        var registrar = event.registrar("4");
         // O registrar executa os handlers na thread principal do respectivo lado lógico.
         registrar.playToServer(RegionControlPayloads.Request.TYPE, RegionControlPayloads.Request.CODEC,
                 RegionControlNetworking::request);
@@ -92,7 +92,12 @@ public final class RegionControlNetworking {
         if (player == null) return;
         var summaries = TemporalRegionOperations.forPlayer(player).list(player.getUUID()).stream()
                 .map(RegionManagementPayloads.RegionSummary::from).toList();
-        context.reply(new RegionManagementPayloads.ListResponse(summaries));
+        PlayerSelection selection = SelectionManager.get(player);
+        RegionManagementPayloads.DraftSummary draft = selection.isComplete()
+                ? new RegionManagementPayloads.DraftSummary(selection.getDimension().location(),
+                        selection.getPosA(), selection.getPosB())
+                : null;
+        context.reply(new RegionManagementPayloads.ListResponse(summaries, draft));
     }
 
     private static void details(RegionManagementPayloads.RequestDetails payload, IPayloadContext context) {
@@ -109,48 +114,49 @@ public final class RegionControlNetworking {
         if (player == null) return;
         RegionOperationResult result = TemporalRegionOperations.forPlayer(player)
                 .createFromSelection(player, SelectionManager.get(player));
-        result.region().ifPresent(region -> SelectionManager.get(player).bindRegion(region.id()));
-        reply(context, result);
+        if (result.succeeded()) SelectionManager.get(player).clear();
+        reply(context, RegionManagementPayloads.OperationType.CREATE, result);
     }
 
     private static void rename(RegionManagementPayloads.Rename payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.RENAME, TemporalRegionOperations.forPlayer(player)
                 .rename(player.getUUID(), payload.regionId(), payload.name()));
     }
 
     private static void updateTimeScale(RegionManagementPayloads.UpdateTimeScale payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.TIME_SCALE, TemporalRegionOperations.forPlayer(player)
                 .updateTimeScale(player.getUUID(), payload.regionId(), payload.timeScale()));
     }
 
     private static void updateMode(RegionManagementPayloads.UpdateMode payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.MODE, TemporalRegionOperations.forPlayer(player)
                 .updateMode(player.getUUID(), payload.regionId(), payload.mode()));
     }
 
     private static void updateTargets(RegionManagementPayloads.UpdateTargets payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.TARGETS, TemporalRegionOperations.forPlayer(player)
                 .updateTargets(player.getUUID(), payload.regionId(), payload.targets()));
     }
 
     private static void setEnabled(RegionManagementPayloads.SetEnabled payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.ENABLED, TemporalRegionOperations.forPlayer(player)
                 .setEnabled(player.getUUID(), payload.regionId(), payload.enabled()));
     }
 
     private static void delete(RegionManagementPayloads.Delete payload, IPayloadContext context) {
         ServerPlayer player = serverPlayer(context);
-        if (player != null) reply(context, TemporalRegionOperations.forPlayer(player)
+        if (player != null) reply(context, RegionManagementPayloads.OperationType.DELETE, TemporalRegionOperations.forPlayer(player)
                 .delete(player.getUUID(), payload.regionId()));
     }
 
-    private static void reply(IPayloadContext context, RegionOperationResult result) {
-        context.reply(new RegionManagementPayloads.OperationResponse(wireStatus(result),
+    private static void reply(IPayloadContext context, RegionManagementPayloads.OperationType operation,
+            RegionOperationResult result) {
+        context.reply(new RegionManagementPayloads.OperationResponse(operation, wireStatus(result),
                 result.region().map(RegionManagementPayloads.RegionSummary::from).orElse(null)));
     }
 

@@ -2,8 +2,6 @@ package io.github.korteexz.ragephysics.item;
 
 import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.selection.SelectionManager;
-import io.github.korteexz.ragephysics.timestamper.region.RegionOperationStatus;
-import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionOperations;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -64,15 +62,6 @@ public class SelectionWandItem extends Item {
 
         // Faz a seleção.
         selection.select(level.dimension(), clickedPos);
-        RegionOperationStatus createStatus = RegionOperationStatus.SUCCESS;
-        if (selection.isComplete()) {
-            // Compatibilidade temporária até a LVL 3C: completar A+B ainda cria
-            // imediatamente, mas toda regra passa pela API server-authoritative.
-            var result = TemporalRegionOperations.forPlayer((net.minecraft.server.level.ServerPlayer) player)
-                    .createFromSelection((net.minecraft.server.level.ServerPlayer) player, selection);
-            result.region().ifPresent(created -> selection.bindRegion(created.id()));
-            createStatus = result.status();
-        }
 
 
         // Feedback visual provisório via chat.
@@ -96,9 +85,7 @@ public class SelectionWandItem extends Item {
                     false
             );
 
-            player.displayClientMessage(Component.literal(createStatus == RegionOperationStatus.SUCCESS
-                    ? "[RAGE PHYSICS] Região selecionada."
-                    : "[RAGE PHYSICS] Região sobrepõe outra região e não foi criada."), false);
+            player.displayClientMessage(Component.translatable("message.ragephysics.draft_ready"), false);
         }
 
 

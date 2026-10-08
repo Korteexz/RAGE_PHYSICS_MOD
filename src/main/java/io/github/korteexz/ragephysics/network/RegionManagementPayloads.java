@@ -18,6 +18,12 @@ import net.minecraft.resources.ResourceLocation;
 
 /** Typed wire contract for the future Region Manager. Owner identity is never client-provided. */
 public final class RegionManagementPayloads {
+    public enum OperationType {
+        CREATE, RENAME, TIME_SCALE, MODE, TARGETS, ENABLED, DELETE
+    }
+
+    public record DraftSummary(ResourceLocation dimension, BlockPos posA, BlockPos posB) {}
+
     public record RegionSummary(UUID id, String name, ResourceLocation dimension, BlockPos min, BlockPos max,
             double timeScale, boolean enabled, TemporalMode mode, Set<TemporalTarget> targets, long revision) {
         public RegionSummary {
@@ -98,20 +104,22 @@ public final class RegionManagementPayloads {
         @Override public Type<Delete> type() { return TYPE; }
     }
 
-    public record ListResponse(List<RegionSummary> regions) implements CustomPacketPayload {
+    public record ListResponse(List<RegionSummary> regions, DraftSummary draft) implements CustomPacketPayload {
         public ListResponse { regions = List.copyOf(regions); }
         public static final Type<ListResponse> TYPE = new Type<>(id("region_list"));
         public static final StreamCodec<FriendlyByteBuf, ListResponse> CODEC = StreamCodec.of(
                 (buf, value) -> {
                     buf.writeVarInt(value.regions.size());
                     for (RegionSummary region : value.regions) writeSummary(buf, region);
+                    buf.writeBoolean(value.draft != null);
+                    if (value.draft != null) writeDraft(buf, value.draft);
                 },
                 buf -> {
                     int size = buf.readVarInt();
                     if (size < 0 || size > 4096) throw new IllegalArgumentException("Invalid region list size: " + size);
                     List<RegionSummary> regions = new ArrayList<>(size);
                     for (int index = 0; index < size; index++) regions.add(readSummary(buf));
-                    return new ListResponse(regions);
+                    return new ListResponse(regions, buf.readBoolean() ? readDraft(buf) : null);
                 });
         @Override public Type<ListResponse> type() { return TYPE; }
     }
@@ -129,16 +137,18 @@ public final class RegionManagementPayloads {
         @Override public Type<DetailsResponse> type() { return TYPE; }
     }
 
-    public record OperationResponse(RegionOperationStatus status, RegionSummary region) implements CustomPacketPayload {
+    public record OperationResponse(OperationType operation, RegionOperationStatus status, RegionSummary region)
+            implements CustomPacketPayload {
         public static final Type<OperationResponse> TYPE = new Type<>(id("region_operation_result"));
         public static final StreamCodec<FriendlyByteBuf, OperationResponse> CODEC = StreamCodec.of(
                 (buf, value) -> {
+                    buf.writeEnum(value.operation);
                     buf.writeEnum(value.status);
                     buf.writeBoolean(value.region != null);
                     if (value.region != null) writeSummary(buf, value.region);
                 },
-                buf -> new OperationResponse(buf.readEnum(RegionOperationStatus.class),
-                        buf.readBoolean() ? readSummary(buf) : null));
+                buf -> new OperationResponse(buf.readEnum(OperationType.class),
+                        buf.readEnum(RegionOperationStatus.class), buf.readBoolean() ? readSummary(buf) : null));
         @Override public Type<OperationResponse> type() { return TYPE; }
     }
 
@@ -159,6 +169,16 @@ public final class RegionManagementPayloads {
         return new RegionSummary(buf.readUUID(), buf.readUtf(256), buf.readResourceLocation(),
                 buf.readBlockPos(), buf.readBlockPos(), buf.readDouble(), buf.readBoolean(),
                 buf.readEnum(TemporalMode.class), targets(buf.readVarInt()), buf.readVarLong());
+    }
+
+    private static void writeDraft(FriendlyByteBuf buf, DraftSummary draft) {
+        buf.writeResourceLocation(draft.dimension);
+        buf.writeBlockPos(draft.posA);
+        buf.writeBlockPos(draft.posB);
+    }
+
+    private static DraftSummary readDraft(FriendlyByteBuf buf) {
+        return new DraftSummary(buf.readResourceLocation(), buf.readBlockPos(), buf.readBlockPos());
     }
 
     private static int targetMask(Set<TemporalTarget> targets) {

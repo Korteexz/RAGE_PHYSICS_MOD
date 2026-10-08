@@ -10,10 +10,13 @@ import io.github.korteexz.ragephysics.timestamper.region.RegionOperationStatus;
 import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.temporal.TemporalRegionResolver;
 import io.github.korteexz.ragephysics.network.RegionManagementPayloads;
+import io.netty.buffer.Unpooled;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.level.Level;
 
 /** Small pure-Java checks for the Timestamper domain contract. */
@@ -217,6 +220,13 @@ public final class TemporalRegionDomainChecks {
                 data.getById(id).orElseThrow());
         check(summary.id().equals(id) && summary.name().equals(data.getById(id).orElseThrow().name())
                 && summary.targets().equals(data.getById(id).orElseThrow().targets()), "summary matches stored data");
+        payloadCodecChecks(summary);
+
+        PlayerSelection consumedDraft = selection(200, 201, 1.0);
+        consumedDraft.bindRegion(UUID.randomUUID());
+        consumedDraft.clear();
+        check(!consumedDraft.hasPosA() && !consumedDraft.isComplete() && consumedDraft.getRegionId() == null,
+                "successful create can consume draft");
 
         check(operations.delete(other, id).status() == RegionOperationStatus.NOT_OWNER, "foreign delete rejected");
         check(operations.delete(owner, id).succeeded(), "owner delete succeeds");
@@ -238,6 +248,37 @@ public final class TemporalRegionDomainChecks {
         check(afterSave.targets().equals(Set.of(TemporalTarget.MOBS, TemporalTarget.PROJECTILES)), "targets persist");
         check(!afterSave.enabled(), "enabled persists");
         check(afterSave.revision() == beforeSave.revision(), "revision persists");
+    }
+
+    private static void payloadCodecChecks(RegionManagementPayloads.RegionSummary summary) {
+        RegionManagementPayloads.DraftSummary draft = new RegionManagementPayloads.DraftSummary(
+                Level.OVERWORLD.location(), new BlockPos(1, 2, 3), new BlockPos(4, 5, 6));
+        RegionManagementPayloads.ListResponse source = new RegionManagementPayloads.ListResponse(List.of(summary), draft);
+        FriendlyByteBuf listBuffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            RegionManagementPayloads.ListResponse.CODEC.encode(listBuffer, source);
+            RegionManagementPayloads.ListResponse decoded = RegionManagementPayloads.ListResponse.CODEC.decode(listBuffer);
+            check(decoded.regions().size() == 1 && decoded.regions().getFirst().id().equals(summary.id()),
+                    "region list payload codec");
+            check(decoded.draft() != null && decoded.draft().posA().equals(draft.posA())
+                    && decoded.draft().posB().equals(draft.posB()), "draft payload codec");
+        } finally {
+            listBuffer.release();
+        }
+
+        RegionManagementPayloads.OperationResponse operation = new RegionManagementPayloads.OperationResponse(
+                RegionManagementPayloads.OperationType.MODE, RegionOperationStatus.SUCCESS, summary);
+        FriendlyByteBuf operationBuffer = new FriendlyByteBuf(Unpooled.buffer());
+        try {
+            RegionManagementPayloads.OperationResponse.CODEC.encode(operationBuffer, operation);
+            RegionManagementPayloads.OperationResponse decoded =
+                    RegionManagementPayloads.OperationResponse.CODEC.decode(operationBuffer);
+            check(decoded.operation() == RegionManagementPayloads.OperationType.MODE
+                    && decoded.status() == RegionOperationStatus.SUCCESS
+                    && decoded.region().id().equals(summary.id()), "operation payload codec");
+        } finally {
+            operationBuffer.release();
+        }
     }
 
     private static PlayerSelection selection(int minX, int maxX, double scale) {
