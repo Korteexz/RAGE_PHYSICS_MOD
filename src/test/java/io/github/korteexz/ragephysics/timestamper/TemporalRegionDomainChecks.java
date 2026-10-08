@@ -5,6 +5,11 @@ import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionBounds;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionOperations;
+import io.github.korteexz.ragephysics.timestamper.region.RegionOperationStatus;
+import io.github.korteexz.ragephysics.selection.PlayerSelection;
+import io.github.korteexz.ragephysics.temporal.TemporalRegionResolver;
+import io.github.korteexz.ragephysics.network.RegionManagementPayloads;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
@@ -59,7 +64,7 @@ public final class TemporalRegionDomainChecks {
         check(!data.setEnabled(other, disabled.id(), true), "conflicting re-enable rejected");
         TemporalRegion unchanged = copy(first, first.bounds(), first.enabled());
         check(data.update(owner, unchanged), "unchanged bounds accepted");
-        check(data.getById(first.id()).orElseThrow().revision() == 1, "update advances revision");
+        check(data.getById(first.id()).orElseThrow().revision() == 0, "unchanged update keeps revision");
         TemporalRegion collidingEdit = copy(first, new TemporalRegionBounds(new BlockPos(15, 0, 0), new BlockPos(25, 9, 9)), true);
         check(!data.update(owner, collidingEdit), "colliding bounds edit rejected");
         check(!data.update(other, unchanged), "foreign owner update rejected");
@@ -77,8 +82,170 @@ public final class TemporalRegionDomainChecks {
         check(restored.enabled() == first.enabled(), "persistent enabled");
         check(restored.mode() == first.mode(), "persistent mode");
         check(restored.targets().equals(first.targets()), "persistent targets");
-        check(restored.revision() == 1, "persistent revision");
+        check(restored.revision() == 0, "persistent revision");
+        operationChecks();
         System.out.println("PASS: " + checks + " timestamper domain checks");
+    }
+
+    private static void operationChecks() {
+        UUID owner = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        TemporalRegionSavedData data = new TemporalRegionSavedData();
+        TemporalRegionOperations operations = new TemporalRegionOperations(data);
+
+        check(operations.createFromSelection(owner, Level.OVERWORLD, new PlayerSelection()).status()
+                == RegionOperationStatus.NO_SELECTION, "empty selection rejected");
+        PlayerSelection incomplete = new PlayerSelection();
+        incomplete.select(Level.OVERWORLD, new BlockPos(0, 0, 0));
+        check(operations.createFromSelection(owner, Level.OVERWORLD, incomplete).status()
+                == RegionOperationStatus.INCOMPLETE_SELECTION, "incomplete selection rejected");
+        PlayerSelection wrongDimension = selection(100, 109, 1.0);
+        check(operations.createFromSelection(owner, Level.NETHER, wrongDimension).status()
+                == RegionOperationStatus.INVALID_DIMENSION, "selection dimension validated");
+
+        PlayerSelection firstSelection = selection(0, 9, 2.0);
+        var createdResult = operations.createFromSelection(owner, Level.OVERWORLD, firstSelection);
+        check(createdResult.succeeded(), "complete selection creates");
+        TemporalRegion created = createdResult.region().orElseThrow();
+        check(created.id() != null, "new uuid assigned");
+        check(created.owner().equals(owner), "requester becomes owner");
+        check(created.name().equals("Region 1"), "readable deterministic name");
+
+        check(operations.createFromSelection(other, Level.OVERWORLD, selection(5, 12, 1.0)).status()
+                == RegionOperationStatus.OVERLAP, "create overlap rejected");
+        check(operations.createFromSelection(owner, Level.OVERWORLD, selection(10, 19, 1.0)).succeeded(),
+                "adjacent create accepted");
+        check(data.getByOwner(owner).size() == 2, "second region preserves first");
+
+        UUID id = created.id();
+        long revision = created.revision();
+        var renamed = operations.rename(owner, id, "  Lab  ");
+        check(renamed.succeeded() && renamed.region().orElseThrow().name().equals("Lab"), "rename trims");
+        check(renamed.region().orElseThrow().id().equals(id), "rename preserves uuid");
+        check(operations.rename(owner, id, "   ").status() == RegionOperationStatus.INVALID_NAME,
+                "empty rename rejected");
+        check(operations.rename(owner, id, "x".repeat(TemporalRegionOperations.MAX_NAME_LENGTH + 1)).status()
+                == RegionOperationStatus.INVALID_NAME, "long rename rejected");
+        long renamedRevision = renamed.region().orElseThrow().revision();
+        check(renamedRevision == revision + 1, "rename increments revision");
+        check(operations.rename(owner, id, "Lab").status() == RegionOperationStatus.NO_CHANGE,
+                "same rename is no change");
+        check(data.getById(id).orElseThrow().revision() == renamedRevision, "no-change rename keeps revision");
+        check(operations.rename(other, id, "Stolen").status() == RegionOperationStatus.NOT_OWNER,
+                "foreign rename rejected");
+
+        for (double valid : new double[] {0.125, 1.0, 8.0}) {
+            var result = operations.updateTimeScale(owner, id, valid);
+            check(result.succeeded(), "valid scale " + valid);
+            check(result.region().orElseThrow().id().equals(id), "scale preserves uuid " + valid);
+        }
+        long scaleRevision = data.getById(id).orElseThrow().revision();
+        check(operations.updateTimeScale(owner, id, 8.0).status() == RegionOperationStatus.NO_CHANGE,
+                "same scale is no change");
+        check(data.getById(id).orElseThrow().revision() == scaleRevision, "no-change scale keeps revision");
+        for (double invalid : new double[] {Double.NaN, Double.POSITIVE_INFINITY, 0.124, 8.001}) {
+            check(operations.updateTimeScale(owner, id, invalid).status() == RegionOperationStatus.INVALID_TIME_SCALE,
+                    "invalid operation scale " + invalid);
+        }
+        check(operations.updateTimeScale(other, id, 2.0).status() == RegionOperationStatus.NOT_OWNER,
+                "foreign scale update rejected");
+
+        check(operations.updateMode(owner, id, null).status() == RegionOperationStatus.INVALID_MODE,
+                "null mode rejected");
+        check(operations.updateMode(owner, id, TemporalMode.SIMULATION_ONLY).succeeded(), "simulation mode update");
+        TemporalRegion simulationOnly = data.getById(id).orElseThrow();
+        check(TemporalRegionResolver.allowsSimulation(simulationOnly, TemporalTarget.MOBS, true),
+                "simulation-only participates");
+        check(operations.updateMode(owner, id, TemporalMode.SIMULATION_AND_VISUAL).succeeded(),
+                "combined mode update");
+        check(TemporalRegionResolver.allowsSimulation(data.getById(id).orElseThrow(), TemporalTarget.MOBS, true),
+                "combined mode participates");
+        check(operations.updateMode(owner, id, TemporalMode.VISUAL_ONLY).succeeded(), "visual-only mode update");
+        check(!TemporalRegionResolver.allowsSimulation(data.getById(id).orElseThrow(), TemporalTarget.MOBS, true),
+                "visual-only skips simulation");
+        check(operations.updateMode(owner, id, TemporalMode.SIMULATION_ONLY).succeeded(), "restore simulation mode");
+
+        check(operations.updateTargets(owner, id, Set.of(TemporalTarget.PROJECTILES)).succeeded(),
+                "projectile-only targets");
+        TemporalRegion projectileOnly = data.getById(id).orElseThrow();
+        check(TemporalRegionResolver.allowsSimulation(projectileOnly, TemporalTarget.PROJECTILES, true),
+                "projectile target allowed");
+        check(!TemporalRegionResolver.allowsSimulation(projectileOnly, TemporalTarget.MOBS, true),
+                "mob target excluded");
+        check(operations.updateTargets(owner, id, Set.of(TemporalTarget.MOBS)).succeeded(), "mob-only targets");
+        TemporalRegion mobOnly = data.getById(id).orElseThrow();
+        check(TemporalRegionResolver.allowsSimulation(mobOnly, TemporalTarget.MOBS, true), "mob target allowed");
+        check(!TemporalRegionResolver.allowsSimulation(mobOnly, TemporalTarget.PROJECTILES, true),
+                "projectile target excluded");
+        check(operations.updateTargets(owner, id, Set.of(TemporalTarget.BLOCK_ENTITIES)).succeeded(),
+                "block-entity-only targets");
+        check(TemporalRegionResolver.allowsSimulation(data.getById(id).orElseThrow(), TemporalTarget.BLOCK_ENTITIES, true),
+                "block entity target allowed");
+        check(!TemporalRegionResolver.allowsSimulation(data.getById(id).orElseThrow(), TemporalTarget.BLOCK_ENTITIES, false),
+                "global config cannot be overridden by region");
+        check(!TemporalRegionResolver.allowsSimulation(data.getById(id).orElseThrow(), TemporalTarget.PLAYER, true),
+                "unimplemented target remains inactive");
+        check(operations.updateTargets(owner, id, null).status() == RegionOperationStatus.INVALID_TARGETS,
+                "null target set rejected");
+        long targetRevision = data.getById(id).orElseThrow().revision();
+        check(operations.updateTargets(owner, id, Set.of(TemporalTarget.BLOCK_ENTITIES)).status()
+                == RegionOperationStatus.NO_CHANGE, "identical targets are no change");
+        check(data.getById(id).orElseThrow().revision() == targetRevision,
+                "identical targets keep revision");
+        check(TemporalTarget.MOBS != TemporalTarget.OTHER_ENTITIES
+                && TemporalTarget.PROJECTILES != TemporalTarget.OTHER_ENTITIES,
+                "entity target categories are exclusive enum values");
+
+        check(operations.setEnabled(owner, id, false).succeeded(), "disable succeeds");
+        check(!data.getActiveRegions(Level.OVERWORLD).stream().anyMatch(region -> region.id().equals(id)),
+                "disabled removed from active resolver input");
+        check(operations.setEnabled(owner, id, true).succeeded(), "valid enable succeeds");
+        TemporalRegion disabledOverlap = region(other, Level.OVERWORLD, 0, 9, false);
+        check(data.create(other, disabledOverlap), "disabled overlap prepared");
+        long disabledRevision = disabledOverlap.revision();
+        check(operations.setEnabled(other, disabledOverlap.id(), true).status() == RegionOperationStatus.OVERLAP,
+                "conflicting enable rejected");
+        check(data.getById(disabledOverlap.id()).orElseThrow().revision() == disabledRevision,
+                "failed enable keeps revision");
+
+        check(operations.get(owner, id).succeeded(), "owner details lookup");
+        check(operations.get(other, id).status() == RegionOperationStatus.NOT_OWNER, "foreign details rejected");
+        check(operations.list(owner).size() == 2, "owner list contains all owner regions");
+        check(operations.list(owner).stream().noneMatch(region -> region.owner().equals(other)),
+                "owner list excludes foreign regions");
+        RegionManagementPayloads.RegionSummary summary = RegionManagementPayloads.RegionSummary.from(
+                data.getById(id).orElseThrow());
+        check(summary.id().equals(id) && summary.name().equals(data.getById(id).orElseThrow().name())
+                && summary.targets().equals(data.getById(id).orElseThrow().targets()), "summary matches stored data");
+
+        check(operations.delete(other, id).status() == RegionOperationStatus.NOT_OWNER, "foreign delete rejected");
+        check(operations.delete(owner, id).succeeded(), "owner delete succeeds");
+        check(data.getById(id).isEmpty(), "deleted region absent from lookup");
+        check(data.getByOwner(owner).stream().noneMatch(region -> region.id().equals(id)),
+                "deleted region absent from preview/list source");
+
+        UUID persistedId = operations.list(owner).getFirst().id();
+        operations.rename(owner, persistedId, "Persistent");
+        operations.updateMode(owner, persistedId, TemporalMode.SIMULATION_AND_VISUAL);
+        operations.updateTargets(owner, persistedId, Set.of(TemporalTarget.MOBS, TemporalTarget.PROJECTILES));
+        operations.setEnabled(owner, persistedId, false);
+        TemporalRegion beforeSave = data.getById(persistedId).orElseThrow();
+        TemporalRegionSavedData reloaded = TemporalRegionSavedData.load(
+                data.save(new net.minecraft.nbt.CompoundTag(), null), null);
+        TemporalRegion afterSave = reloaded.getById(persistedId).orElseThrow();
+        check(afterSave.name().equals("Persistent"), "rename persists");
+        check(afterSave.mode() == TemporalMode.SIMULATION_AND_VISUAL, "mode persists");
+        check(afterSave.targets().equals(Set.of(TemporalTarget.MOBS, TemporalTarget.PROJECTILES)), "targets persist");
+        check(!afterSave.enabled(), "enabled persists");
+        check(afterSave.revision() == beforeSave.revision(), "revision persists");
+    }
+
+    private static PlayerSelection selection(int minX, int maxX, double scale) {
+        PlayerSelection selection = new PlayerSelection();
+        selection.select(Level.OVERWORLD, new BlockPos(minX, 0, 0));
+        selection.select(Level.OVERWORLD, new BlockPos(maxX, 9, 9));
+        check(selection.updateTimeScale(selection.getRevision(), scale), "prepare selection scale");
+        return selection;
     }
 
     private static TemporalRegion region(UUID owner, net.minecraft.resources.ResourceKey<Level> dimension,

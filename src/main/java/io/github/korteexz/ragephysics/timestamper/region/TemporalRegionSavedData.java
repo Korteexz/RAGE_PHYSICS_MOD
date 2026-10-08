@@ -1,6 +1,5 @@
 package io.github.korteexz.ragephysics.timestamper.region;
 
-import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.timestamper.config.TemporalMode;
 import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import java.util.EnumSet;
@@ -25,9 +24,6 @@ import net.minecraft.world.level.saveddata.SavedData;
 /** Persistent, server-authoritative catalog of all Timestamper regions in a world. */
 public final class TemporalRegionSavedData extends SavedData {
     public static final String FILE_ID = "ragephysics_temporal_regions";
-    private static final Set<TemporalTarget> PROTOTYPE_TARGETS = EnumSet.of(
-            TemporalTarget.MOBS, TemporalTarget.PROJECTILES,
-            TemporalTarget.OTHER_ENTITIES, TemporalTarget.BLOCK_ENTITIES);
     private final Map<UUID, TemporalRegion> regions = new LinkedHashMap<>();
 
     public static Factory<TemporalRegionSavedData> factory() {
@@ -58,15 +54,6 @@ public final class TemporalRegionSavedData extends SavedData {
         return List.copyOf(regions.values());
     }
 
-    public Optional<TemporalRegion> createForSelection(UUID owner, PlayerSelection selection) {
-        if (!selection.isComplete()) return Optional.empty();
-        UUID id = UUID.randomUUID();
-        TemporalRegion region = new TemporalRegion(id, owner, "Region " + id.toString().substring(0, 8),
-                selection.getDimension(), new TemporalRegionBounds(selection.getPosA(), selection.getPosB()),
-                selection.getTimeScale(), true, TemporalMode.SIMULATION_AND_VISUAL, PROTOTYPE_TARGETS, 0);
-        return create(owner, region) ? Optional.of(region) : Optional.empty();
-    }
-
     public boolean create(UUID requester, TemporalRegion region) {
         if (!requester.equals(region.owner()) || regions.containsKey(region.id()) || conflicts(region, null)) return false;
         regions.put(region.id(), region);
@@ -74,21 +61,16 @@ public final class TemporalRegionSavedData extends SavedData {
         return true;
     }
 
-    /** Replaces all editable fields and advances revision after centralized validation. */
+    /** Replaces changed editable fields and advances revision after centralized validation. */
     public boolean update(UUID requester, TemporalRegion proposed) {
         TemporalRegion current = regions.get(proposed.id());
         if (current == null || !current.owner().equals(requester) || !proposed.owner().equals(requester)
                 || conflicts(proposed, proposed.id())) return false;
+        if (samePersistedState(current, proposed)) return true;
         TemporalRegion updated = copyWithRevision(proposed, current.revision() + 1);
         regions.put(updated.id(), updated);
         setDirty();
         return true;
-    }
-
-    public boolean updateTimeScale(UUID requester, UUID id, double timeScale) {
-        TemporalRegion current = regions.get(id);
-        if (current == null || !current.owner().equals(requester) || !TemporalRegion.isValidTimeScale(timeScale)) return false;
-        return update(requester, copy(current, current.bounds(), timeScale, current.enabled()));
     }
 
     public boolean setEnabled(UUID requester, UUID id, boolean enabled) {
@@ -126,6 +108,19 @@ public final class TemporalRegionSavedData extends SavedData {
     private static TemporalRegion copyWithRevision(TemporalRegion region, long revision) {
         return new TemporalRegion(region.id(), region.owner(), region.name(), region.dimension(), region.bounds(),
                 region.timeScale(), region.enabled(), region.mode(), region.targets(), revision);
+    }
+
+    private static boolean samePersistedState(TemporalRegion first, TemporalRegion second) {
+        return first.id().equals(second.id())
+                && first.owner().equals(second.owner())
+                && first.name().equals(second.name())
+                && first.dimension().equals(second.dimension())
+                && first.bounds().min().equals(second.bounds().min())
+                && first.bounds().max().equals(second.bounds().max())
+                && Double.compare(first.timeScale(), second.timeScale()) == 0
+                && first.enabled() == second.enabled()
+                && first.mode() == second.mode()
+                && first.targets().equals(second.targets());
     }
 
     public static TemporalRegionSavedData load(CompoundTag tag, HolderLookup.Provider registries) {

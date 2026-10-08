@@ -48,7 +48,8 @@ public final class ClientInputHandler {
                         && minecraft.level.dimension().location().equals(payload.dimension())) {
                     minecraft.setScreen(new RegionControlScreen(payload));
                 }
-            }, (payload, context) -> TemporalEntityPresentation.receive(payload));
+            }, (payload, context) -> TemporalEntityPresentation.receive(payload),
+                    (payload, context) -> {}, (payload, context) -> {}, (payload, context) -> {});
         }
     }
 

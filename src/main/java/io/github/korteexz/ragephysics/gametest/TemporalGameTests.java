@@ -8,6 +8,8 @@ import io.github.korteexz.ragephysics.temporal.TemporalEntityTicker;
 import io.github.korteexz.ragephysics.temporal.TemporalRegionResolver;
 import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionOperations;
+import io.github.korteexz.ragephysics.timestamper.region.RegionOperationStatus;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -40,6 +42,7 @@ public final class TemporalGameTests {
         Player otherOwner = helper.makeMockPlayer(GameType.CREATIVE);
         PlayerSelection selection = SelectionManager.get(owner);
         TemporalRegionSavedData data = TemporalRegionSavedData.get(level);
+        TemporalRegionOperations operations = new TemporalRegionOperations(data);
         BlockPos origin = helper.absolutePos(new BlockPos(3, 1000, 3));
         BlockPos a = origin.offset(-100, -10000, -100);
         BlockPos b = origin.offset(100, 10000, 100);
@@ -47,15 +50,15 @@ public final class TemporalGameTests {
             selection.select(level.dimension(), a);
             selection.select(level.dimension(), b);
             check(selection.updateTimeScale(selection.getRevision(), .25), "selection update");
-            var created = data.createForSelection(owner.getUUID(), selection);
-            check(created.isPresent(), "region created");
-            selection.bindRegion(created.orElseThrow().id());
+            var created = operations.createFromSelection(owner.getUUID(), level.dimension(), selection);
+            check(created.succeeded(), "region created");
+            selection.bindRegion(created.region().orElseThrow().id());
             check(TemporalRegionResolver.resolve(level, origin, TemporalTarget.PROJECTILES) != null, "inside region");
             check(data.getActiveRegions(Level.NETHER).isEmpty(), "dimension isolation");
             check(TemporalRegionResolver.resolve(level, b.east(), TemporalTarget.PROJECTILES) == null, "outside region");
-            check(data.setEnabled(owner.getUUID(), selection.getRegionId(), false), "disable region");
+            check(operations.setEnabled(owner.getUUID(), selection.getRegionId(), false).succeeded(), "disable region");
             check(TemporalRegionResolver.resolve(level, origin, TemporalTarget.PROJECTILES) == null, "disabled not resolved");
-            check(data.setEnabled(owner.getUUID(), selection.getRegionId(), true), "re-enable region");
+            check(operations.setEnabled(owner.getUUID(), selection.getRegionId(), true).succeeded(), "re-enable region");
             check(!TemporalConfig.enabled(TemporalTarget.PLAYER), "players remain vanilla");
             check(TemporalTarget.classify(owner) == TemporalTarget.PLAYER, "exclusive player category");
             check(SelectionManager.get(otherOwner).getTimeScale() == 1, "independent authorship");
@@ -66,7 +69,8 @@ public final class TemporalGameTests {
             // O dispatcher transformado pelo Mixin deve produzir a mesma trajetória que N ticks vanilla.
             for (double[] sample : new double[][] {{.25, 80, 20}, {4, 20, 80}, {2.5, 40, 100}, {.17, 100, 17}, {1, 40, 40}}) {
                 selection.updateTimeScale(selection.getRevision(), sample[0]);
-                check(data.updateTimeScale(owner.getUUID(), selection.getRegionId(), sample[0]), "scale update");
+                var scaleResult = operations.updateTimeScale(owner.getUUID(), selection.getRegionId(), sample[0]);
+                check(scaleResult.succeeded() || scaleResult.status() == RegionOperationStatus.NO_CHANGE, "scale update");
                 Arrow actual = arrow(level, origin);
                 Arrow reference = arrow(level, origin);
                 check(TemporalTarget.classify(actual) == TemporalTarget.PROJECTILES, "exclusive projectile category");
@@ -83,7 +87,7 @@ public final class TemporalGameTests {
             }
 
             selection.updateTimeScale(selection.getRevision(), .25);
-            check(data.updateTimeScale(owner.getUUID(), selection.getRegionId(), .25), "mob scale update");
+            check(operations.updateTimeScale(owner.getUUID(), selection.getRegionId(), .25).succeeded(), "mob scale update");
             Zombie zombie = EntityType.ZOMBIE.create(level);
             zombie.setPos(Vec3.atCenterOf(origin));
             zombie.setNoGravity(true);
@@ -113,7 +117,8 @@ public final class TemporalGameTests {
             second.select(level.dimension(), a);
             second.select(level.dimension(), b);
             second.updateTimeScale(second.getRevision(), 4);
-            check(data.createForSelection(otherOwner.getUUID(), second).isEmpty(), "overlap rejected without winner");
+            check(operations.createFromSelection(otherOwner.getUUID(), level.dimension(), second).status()
+                    == RegionOperationStatus.OVERLAP, "overlap rejected without winner");
             check(TemporalRegionResolver.resolve(level, origin, TemporalTarget.PROJECTILES).owner().equals(owner.getUUID()), "single valid region");
             long oldRevision = selection.getRevision();
             selection.select(Level.NETHER, origin);
@@ -177,7 +182,8 @@ public final class TemporalGameTests {
         selection.select(owner.level().dimension(), pos);
         selection.select(owner.level().dimension(), pos);
         selection.updateTimeScale(selection.getRevision(), scale);
-        var region = data.createForSelection(owner.getUUID(), selection).orElseThrow();
+        var region = new TemporalRegionOperations(data)
+                .createFromSelection(owner.getUUID(), owner.level().dimension(), selection).region().orElseThrow();
         selection.bindRegion(region.id());
     }
 
