@@ -1,7 +1,7 @@
 package io.github.korteexz.ragephysics.temporal;
 
 import java.util.EnumMap;
-import java.util.Locale;
+import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /** Registrada como SERVER. Clientes nunca decidem a simulação a partir desta cópia. */
@@ -17,7 +17,7 @@ public final class TemporalConfig {
             builder.comment(target.implemented()
                     ? "Enable local time for " + target + "."
                     : "RESERVED / NOT IMPLEMENTED. Setting true currently has NO EFFECT: " + target + ".");
-            VALUES.put(target, builder.define(target.name().toLowerCase(Locale.ROOT), target.implemented()));
+            VALUES.put(target, builder.define(target.configKey(), target.implemented()));
         }
         builder.pop();
         SPEC = builder.build();

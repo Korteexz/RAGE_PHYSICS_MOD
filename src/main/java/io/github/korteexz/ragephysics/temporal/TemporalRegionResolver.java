@@ -2,11 +2,12 @@ package io.github.korteexz.ragephysics.temporal;
 
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
+import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
 public final class TemporalRegionResolver {
-    /** Uma região vencedora, nunca produto de escalas. 1x não mascara regiões ativas. */
+    /** Retorna no máximo uma região válida; overlap enabled é rejeitado pelo armazenamento. */
     public static TemporalRegion resolve(ServerLevel level, BlockPos pos, TemporalTarget target) {
         if (!TemporalConfig.enabled(target)) return null;
         TemporalRegion resolved = null;

@@ -6,7 +6,10 @@ import io.github.korteexz.ragephysics.selection.PlayerSelection;
 import io.github.korteexz.ragephysics.selection.SelectionManager;
 import io.github.korteexz.ragephysics.selection.TimeScaleVisuals;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionBounds;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
+
+import java.util.List;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -23,6 +26,7 @@ public final class SelectionPreviewHandler {
 
     // Distância entre uma "estrela" e outra.
     private static final double STEP = 0.5;
+    private static final int MAX_PERSISTENT_PREVIEWS = 32;
 
 
     // =========================
@@ -52,29 +56,74 @@ public final class SelectionPreviewHandler {
         PlayerSelection selection =
                 SelectionManager.get(player);
 
+        ServerLevel level = player.serverLevel();
+        TemporalRegionSavedData savedData = TemporalRegionSavedData.get(level);
+
+        // Regiões persistentes são a fonte autoritativa do preview. Regiões
+        // desabilitadas ficam fora do preview até existir uma representação
+        // visual específica para esse estado.
+        List<TemporalRegion> ownedRegions = savedData.getByOwner(player.getUUID());
+        TemporalRegion boundRegion = selection.getRegionId() == null ? null
+                : savedData.getById(selection.getRegionId()).orElse(null);
+
+        int renderedPersistent = 0;
+        boolean boundRegionRendered = false;
+        for (TemporalRegion region : ownedRegions) {
+            if (renderedPersistent >= MAX_PERSISTENT_PREVIEWS) {
+                break;
+            }
+            if (!region.enabled() || !region.owner().equals(player.getUUID())
+                    || !region.dimension().equals(player.level().dimension())) {
+                continue;
+            }
+
+            drawBox(level, player, region.bounds().min(), region.bounds().max(),
+                    colorFor(region.timeScale()));
+            renderedPersistent++;
+            if (boundRegion != null && region.id().equals(boundRegion.id())) {
+                boundRegionRendered = true;
+            }
+        }
+
         // Sem A + B, ainda não existe caixa completa.
         if (!selection.isComplete() || !selection.isInDimension(player.level().dimension())) {
+            return;
+        }
+
+        // Se o draft aponta para a região persistente que já foi desenhada,
+        // não desenhe a mesma caixa duas vezes. A escala persistida vence.
+        boolean draftMatchesBound = boundRegion != null
+                && boundRegion.owner().equals(player.getUUID())
+                && boundRegion.dimension().equals(player.level().dimension())
+                && sameBounds(boundRegion.bounds(), selection.getPosA(), selection.getPosB());
+        if (draftMatchesBound && !boundRegion.enabled()) {
+            return;
+        }
+        if (draftMatchesBound && boundRegionRendered) {
             return;
         }
 
         BlockPos a = selection.getPosA();
         BlockPos b = selection.getPosB();
 
-        ServerLevel level = player.serverLevel();
-
         drawBox(
                 level,
                 player,
                 a,
                 b,
-                new DustParticleOptions(Vec3.fromRGB24(TimeScaleVisuals.color(activeScale(player, selection))).toVector3f(), 0.65F)
+                colorFor(boundRegion != null && boundRegion.owner().equals(player.getUUID())
+                        ? boundRegion.timeScale() : selection.getTimeScale())
         );
     }
 
-    private static double activeScale(ServerPlayer player, PlayerSelection selection) {
-        TemporalRegion region = selection.getRegionId() == null ? null
-                : TemporalRegionSavedData.get(player.serverLevel()).getById(selection.getRegionId()).orElse(null);
-        return region == null ? selection.getTimeScale() : region.timeScale();
+    private static DustParticleOptions colorFor(double timeScale) {
+        return new DustParticleOptions(
+                Vec3.fromRGB24(TimeScaleVisuals.color(timeScale)).toVector3f(), 0.65F);
+    }
+
+    private static boolean sameBounds(TemporalRegionBounds bounds, BlockPos first, BlockPos second) {
+        TemporalRegionBounds draft = new TemporalRegionBounds(first, second);
+        return draft.min().equals(bounds.min()) && draft.max().equals(bounds.max());
     }
 
 

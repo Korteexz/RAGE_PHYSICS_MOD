@@ -6,7 +6,7 @@ import io.github.korteexz.ragephysics.selection.SelectionManager;
 import io.github.korteexz.ragephysics.temporal.TemporalConfig;
 import io.github.korteexz.ragephysics.temporal.TemporalEntityTicker;
 import io.github.korteexz.ragephysics.temporal.TemporalRegionResolver;
-import io.github.korteexz.ragephysics.temporal.TemporalTarget;
+import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegionSavedData;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -56,8 +56,8 @@ public final class TemporalGameTests {
             check(data.setEnabled(owner.getUUID(), selection.getRegionId(), false), "disable region");
             check(TemporalRegionResolver.resolve(level, origin, TemporalTarget.PROJECTILES) == null, "disabled not resolved");
             check(data.setEnabled(owner.getUUID(), selection.getRegionId(), true), "re-enable region");
-            check(!TemporalConfig.enabled(TemporalTarget.PLAYERS), "players remain vanilla");
-            check(TemporalTarget.classify(owner) == TemporalTarget.PLAYERS, "exclusive player category");
+            check(!TemporalConfig.enabled(TemporalTarget.PLAYER), "players remain vanilla");
+            check(TemporalTarget.classify(owner) == TemporalTarget.PLAYER, "exclusive player category");
             check(SelectionManager.get(otherOwner).getTimeScale() == 1, "independent authorship");
             for (double invalid : new double[] {0, -1, .124, 8.001, Double.NaN, Double.POSITIVE_INFINITY}) {
                 check(!selection.updateTimeScale(selection.getRevision(), invalid), "reject invalid scale");
@@ -89,7 +89,7 @@ public final class TemporalGameTests {
             zombie.setNoGravity(true);
             zombie.setNoAi(true);
             zombie.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 100));
-            check(TemporalTarget.classify(zombie) == TemporalTarget.LIVING_ENTITIES, "exclusive living category");
+            check(TemporalTarget.classify(zombie) == TemporalTarget.MOBS, "exclusive living category");
             for (int i = 0; i < 40; i++) level.tickNonPassenger(zombie);
             check(zombie.tickCount == 10, "mob local steps");
             check(zombie.getEffect(MobEffects.MOVEMENT_SLOWDOWN).getDuration() == 90, "mob timer progression");

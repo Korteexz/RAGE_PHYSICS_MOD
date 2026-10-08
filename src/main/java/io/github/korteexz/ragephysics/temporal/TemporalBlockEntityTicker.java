@@ -1,6 +1,7 @@
 package io.github.korteexz.ragephysics.temporal;
 
 import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
+import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.server.level.ServerLevel;
