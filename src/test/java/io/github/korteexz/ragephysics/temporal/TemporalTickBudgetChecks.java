@@ -10,6 +10,7 @@ public final class TemporalTickBudgetChecks {
     }
 
     public static void main(String[] args) {
+        io.github.korteexz.ragephysics.timestamper.TemporalRegionDomainChecks.run();
         Object region = new Object();
         for (double scale : new double[] {0.125, 0.17, 0.25, 0.5, 0.65, 1.0, 1.35, 1.5, 2, 2.5, 4, 5.72, 8}) {
             TemporalTickBudget budget = new TemporalTickBudget();

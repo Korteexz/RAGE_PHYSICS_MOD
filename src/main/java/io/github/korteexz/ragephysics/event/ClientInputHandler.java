@@ -2,10 +2,9 @@ package io.github.korteexz.ragephysics.event;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import io.github.korteexz.ragephysics.RagePhysics;
-import io.github.korteexz.ragephysics.client.RegionControlScreen;
+import io.github.korteexz.ragephysics.client.RegionManagerClientState;
 import io.github.korteexz.ragephysics.client.TemporalEntityPresentation;
 import io.github.korteexz.ragephysics.network.RegionControlNetworking;
-import io.github.korteexz.ragephysics.network.RegionControlPayloads;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
@@ -14,7 +13,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.settings.KeyConflictContext;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import org.lwjgl.glfw.GLFW;
 
@@ -28,7 +26,7 @@ public final class ClientInputHandler {
         Minecraft minecraft = Minecraft.getInstance();
         while (OPEN_REGION.consumeClick()) {
             if (minecraft.player != null && minecraft.level != null && minecraft.screen == null) {
-                PacketDistributor.sendToServer(RegionControlPayloads.Request.INSTANCE);
+                RegionManagerClientState.requestOpen();
             }
         }
     }
@@ -42,13 +40,11 @@ public final class ClientInputHandler {
 
         @SubscribeEvent
         public static void registerPayloads(RegisterPayloadHandlersEvent event) {
-            RegionControlNetworking.register(event, (payload, context) -> {
-                Minecraft minecraft = Minecraft.getInstance();
-                if (minecraft.player != null && minecraft.level != null && minecraft.screen == null
-                        && minecraft.level.dimension().location().equals(payload.dimension())) {
-                    minecraft.setScreen(new RegionControlScreen(payload));
-                }
-            }, (payload, context) -> TemporalEntityPresentation.receive(payload));
+            RegionControlNetworking.register(event, (payload, context) -> {},
+                    (payload, context) -> TemporalEntityPresentation.receive(payload),
+                    (payload, context) -> RegionManagerClientState.receive(payload),
+                    (payload, context) -> RegionManagerClientState.receive(payload),
+                    (payload, context) -> RegionManagerClientState.receive(payload));
         }
     }
 

@@ -85,12 +85,7 @@ public class SelectionWandItem extends Item {
                     false
             );
 
-            player.displayClientMessage(
-                    Component.literal(
-                            "[RAGE PHYSICS] Região selecionada."
-                    ),
-                    false
-            );
+            player.displayClientMessage(Component.translatable("message.ragephysics.draft_ready"), false);
         }
 
 

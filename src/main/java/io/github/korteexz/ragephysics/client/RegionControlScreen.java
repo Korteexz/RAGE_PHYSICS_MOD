@@ -60,7 +60,7 @@ public final class RegionControlScreen extends Screen {
     private void sendPendingScale() {
         if (timeScale != lastSentScale && minecraft.getConnection() != null && minecraft.player != null
                 && minecraft.player.isAlive() && minecraft.level == levelAtOpen) {
-            PacketDistributor.sendToServer(new RegionControlPayloads.Update(selection.revision(), timeScale));
+            PacketDistributor.sendToServer(new RegionControlPayloads.Update(selection.regionId(), timeScale));
             lastSentScale = timeScale;
         }
     }

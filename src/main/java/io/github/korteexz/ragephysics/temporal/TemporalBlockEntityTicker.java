@@ -1,6 +1,7 @@
 package io.github.korteexz.ragephysics.temporal;
 
-import io.github.korteexz.ragephysics.selection.PlayerSelection;
+import io.github.korteexz.ragephysics.timestamper.region.TemporalRegion;
+import io.github.korteexz.ragephysics.timestamper.config.TemporalTarget;
 import java.util.Map;
 import java.util.WeakHashMap;
 import net.minecraft.server.level.ServerLevel;
@@ -12,7 +13,7 @@ public final class TemporalBlockEntityTicker {
     private static final Map<BlockEntity, TemporalTickBudget> BUDGETS = new WeakHashMap<>();
 
     public static void tick(ServerLevel level, TickingBlockEntity ticker, Runnable vanillaTicker) {
-        PlayerSelection region = TemporalRegionResolver.resolve(level.dimension(), ticker.getPos(), TemporalTarget.BLOCK_ENTITIES);
+        TemporalRegion region = TemporalRegionResolver.resolve(level, ticker.getPos(), TemporalTarget.BLOCK_ENTITIES);
         BlockEntity entity = level.getBlockEntity(ticker.getPos());
         if (region == null || entity == null) {
             if (entity != null) BUDGETS.remove(entity);
@@ -20,15 +21,15 @@ public final class TemporalBlockEntityTicker {
             return;
         }
         TemporalTickBudget budget = BUDGETS.computeIfAbsent(entity, ignored -> new TemporalTickBudget());
-        long revision = region.getRevision();
-        double scale = region.getTimeScale();
-        int steps = budget.advance(region, revision, scale);
+        long revision = region.revision();
+        double scale = region.timeScale();
+        int steps = budget.advance(region.id(), revision, scale);
         for (int step = 0; step < steps; step++) {
             // O ticker original ainda valida estado, chunk, profiling e tratamento de erros.
             vanillaTicker.run();
             if (entity.isRemoved() || ticker.isRemoved() || level.getBlockEntity(ticker.getPos()) != entity
-                    || TemporalRegionResolver.resolve(level.dimension(), ticker.getPos(), TemporalTarget.BLOCK_ENTITIES) != region
-                    || region.getRevision() != revision || region.getTimeScale() != scale) {
+                    || TemporalRegionResolver.resolve(level, ticker.getPos(), TemporalTarget.BLOCK_ENTITIES) != region
+                    || region.revision() != revision || region.timeScale() != scale) {
                 BUDGETS.remove(entity);
                 break;
             }
